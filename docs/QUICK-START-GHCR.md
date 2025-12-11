@@ -52,9 +52,11 @@ After each successful build, you get:
 
 - ✅ Automatic authentication with GHCR
 - ✅ Multi-tag strategy (commit SHA, version, latest)
+- ✅ Multi-platform support (amd64 + arm64)
 - ✅ Build verification before push
 - ✅ Push verification after upload
 - ✅ Integration with existing CI pipeline
+- ✅ Works on Apple Silicon Macs, Intel/AMD, and ARM servers
 
 ## 🔍 Troubleshooting
 

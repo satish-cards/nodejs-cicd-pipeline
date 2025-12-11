@@ -33,19 +33,28 @@ Each successful build creates three image tags:
   - Only created for main branch builds
   - Example: `ghcr.io/myuser/nodejs-cicd-pipeline:latest`
 
-### 3. Build and Push Process
+### 3. Multi-Platform Support
+Images are built for multiple architectures:
+- **linux/amd64**: Intel/AMD processors (most cloud servers, Windows, Linux PCs)
+- **linux/arm64**: ARM processors (Apple Silicon Macs, AWS Graviton, Raspberry Pi)
+
+Docker automatically pulls the correct architecture for your system.
+
+### 4. Build and Push Process
 The workflow:
 1. Reads version from package.json
-2. Builds Docker image locally
+2. Builds Docker image locally for testing (amd64 only)
 3. Tests the image (health check)
-4. Pushes to GHCR with all tags
-5. Verifies push succeeded
+4. Builds multi-platform image (amd64 + arm64)
+5. Pushes to GHCR with all tags
+6. Verifies push succeeded
 
-### 4. Verification Step
+### 5. Verification Step
 After pushing, the workflow logs all created tags for easy verification:
 
 ```bash
-Image pushed successfully to GHCR
+Multi-platform image pushed successfully to GHCR
+Platforms: linux/amd64, linux/arm64
 Image tags:
   - ghcr.io/{owner}/{repo}:{commit-sha}
   - ghcr.io/{owner}/{repo}:v1.0.0
@@ -209,6 +218,28 @@ docker stop test && docker rm test
 4. **Verify job permissions**:
    - The workflow includes `permissions: packages: write`
    - This should be sufficient for most cases
+
+### Error: "no matching manifest for linux/arm64/v8"
+
+**Problem**: Cannot pull image on Apple Silicon Mac (M1/M2/M3)
+
+**Solution**: This has been fixed! The workflow now builds multi-platform images.
+
+**If you still see this error**:
+1. The image was built before multi-platform support was added
+2. Push new code to trigger a fresh build
+3. The new build will include both amd64 and arm64 architectures
+4. Pull the newly built image
+
+**Verify multi-platform support**:
+```bash
+# Check image manifest
+docker manifest inspect ghcr.io/{owner}/nodejs-cicd-pipeline:latest
+
+# You should see both platforms listed:
+# - linux/amd64
+# - linux/arm64
+```
 
 ### Error: "authentication required"
 

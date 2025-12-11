@@ -134,12 +134,13 @@ jobs:
             type=semver,pattern={{major}},value=v${{ fromJSON(steps.package.outputs.json).version }}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build Docker image
+      - name: Build Docker image for testing
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
           tags: nodejs-cicd-pipeline:${{ github.sha }}
+          platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           load: true
@@ -152,12 +153,13 @@ jobs:
           docker stop test-container
           docker rm test-container
 
-      - name: Build and push Docker image to GHCR
+      - name: Build and push multi-platform Docker image to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}
             ghcr.io/${{ github.repository }}:v${{ fromJSON(steps.package.outputs.json).version }}
@@ -168,7 +170,8 @@ jobs:
       - name: Verify image push to GHCR
         if: github.event_name != 'pull_request'
         run: |
-          echo "Image pushed successfully to GHCR"
+          echo "Multi-platform image pushed successfully to GHCR"
+          echo "Platforms: linux/amd64, linux/arm64"
           echo "Image tags:"
           echo "  - ghcr.io/${{ github.repository }}:${{ github.sha }}"
           echo "  - ghcr.io/${{ github.repository }}:v${{ fromJSON(steps.package.outputs.json).version }}"
