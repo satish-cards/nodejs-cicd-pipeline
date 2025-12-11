@@ -20,3 +20,8 @@ configMapGenerator:
 
 patches:
   - path: patches.yaml
+
+images:
+  - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline
+    newName: ghcr.io/satish-cards/nodejs-cicd-pipeline
+    newTag: e0fd8efa5d84931c643b262497020f7504993318
