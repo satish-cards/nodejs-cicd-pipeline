@@ -24,4 +24,4 @@ patches:
 images:
   - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline
     newName: ghcr.io/satish-cards/nodejs-cicd-pipeline
-    newTag: 45b56e47e165c10918640f11f89290374f4df27d
+    newTag: 6d0726a64946e47e6cf527c5d5663161c223c229
