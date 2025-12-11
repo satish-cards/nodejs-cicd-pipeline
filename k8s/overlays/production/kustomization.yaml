@@ -22,7 +22,9 @@ configMapGenerator:
 
 patches:
   - path: patches.yaml
-  - path: service-patch.yaml
+
+patchesStrategicMerge:
+  - service-patch.yaml
 
 images:
   - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline
