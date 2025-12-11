@@ -11,8 +11,8 @@ const sampleUsers = [
   },
   {
     id: '2',
-    name: 'Bob Smith',
-    email: 'bob@example.com',
+    name: 'Venkat',
+    email: 'venkat@gmail.com',
     createdAt: '2024-01-02T00:00:00.000Z'
   },
   {
