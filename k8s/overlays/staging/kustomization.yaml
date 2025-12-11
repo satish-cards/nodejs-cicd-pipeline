@@ -17,9 +17,12 @@ configMapGenerator:
     literals:
       - NODE_ENV=staging
       - LOG_LEVEL=info
+      - ENABLE_METRICS=true
+      - ENABLE_DETAILED_ERRORS=true
 
 patches:
   - path: patches.yaml
+  - path: service-patch.yaml
 
 images:
   - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline

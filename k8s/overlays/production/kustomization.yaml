@@ -17,6 +17,14 @@ configMapGenerator:
     literals:
       - NODE_ENV=production
       - LOG_LEVEL=warn
+      - ENABLE_METRICS=true
+      - ENABLE_DETAILED_ERRORS=false
 
 patches:
   - path: patches.yaml
+  - path: service-patch.yaml
+
+images:
+  - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline
+    newName: ghcr.io/satish-cards/nodejs-cicd-pipeline
+    newTag: 6d0726a64946e47e6cf527c5d5663161c223c229
