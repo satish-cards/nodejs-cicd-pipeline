@@ -209,6 +209,103 @@ docker pull ghcr.io/{owner}/nodejs-cicd-pipeline:latest
 
 See [GitHub Actions Documentation](docs/github-actions.md) for details.
 
+## Kubernetes and ArgoCD Deployment
+
+### 🚀 Quick Setup (3 Commands)
+
+Set up a complete local Kubernetes cluster with ArgoCD for GitOps deployments:
+
+```bash
+# 1. Set up Kubernetes cluster and ArgoCD
+./setup-k8s-argocd.sh
+
+# 2. Configure GHCR image pull secrets
+./setup-ghcr-secrets.sh
+
+# 3. Deploy applications
+kubectl apply -f k8s/argocd/staging-app.yaml
+```
+
+**Time:** ~5-10 minutes total
+
+### Prerequisites
+
+- Docker Desktop running
+- kubectl installed (`brew install kubectl`)
+- minikube installed (`brew install minikube`)
+- GitHub Personal Access Token with `read:packages` permission
+
+### What You Get
+
+- ✅ Local Kubernetes cluster (Minikube)
+- ✅ ArgoCD for GitOps deployments
+- ✅ Staging and Production namespaces
+- ✅ Automated deployments from Git
+- ✅ Complete CI/CD pipeline integration
+
+### Complete Setup Guide
+
+📖 **[Kubernetes & ArgoCD Quick Start](docs/QUICK-START-K8S.md)** - Step-by-step guide
+
+📖 **[Detailed Setup Guide](docs/kubernetes-argocd-setup.md)** - Manual setup instructions
+
+📖 **[Setup Summary](K8S-SETUP-SUMMARY.md)** - Overview and quick reference
+
+### Check Status
+
+```bash
+./check-k8s-status.sh
+```
+
+This shows:
+- Cluster status
+- ArgoCD credentials
+- Application pods
+- Services
+- Quick access commands
+
+### Access Your Application
+
+```bash
+# Option 1: Minikube service (easiest)
+minikube service staging-nodejs-app -n staging
+
+# Option 2: Port forward
+kubectl port-forward svc/staging-nodejs-app -n staging 3000:3000
+
+# Option 3: Get URL
+minikube service staging-nodejs-app -n staging --url
+```
+
+### Complete CI/CD Flow
+
+Once set up, pushing to `main` branch triggers:
+
+1. **GitHub Actions CI** - Lint, test, build Docker image
+2. **GitHub Actions CD** - Push image, update manifests
+3. **ArgoCD** - Automatically syncs and deploys to Kubernetes
+4. **Kubernetes** - Rolling update with zero downtime
+
+### Useful Commands
+
+```bash
+# View all resources
+kubectl get all -n staging
+
+# View logs
+kubectl logs -f deployment/staging-nodejs-app -n staging
+
+# Access ArgoCD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+# Then open: https://localhost:8080
+
+# Restart deployment
+kubectl rollout restart deployment/staging-nodejs-app -n staging
+
+# Rollback
+kubectl rollout undo deployment/staging-nodejs-app -n staging
+```
+
 ## Documentation
 
 - 📖 [Git and GitHub Setup](docs/git-github-setup.md) - Get started with version control

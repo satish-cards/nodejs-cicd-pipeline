@@ -5,7 +5,7 @@ const router = express.Router();
 const sampleUsers = [
   {
     id: '1',
-    name: 'Alice Johnson',
+    name: 'Satish Kumar',
     email: 'alice@example.com',
     createdAt: '2024-01-01T00:00:00.000Z'
   },

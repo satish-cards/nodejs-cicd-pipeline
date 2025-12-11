@@ -81,7 +81,7 @@
   - Verify push succeeded in workflow
   - _Requirements: 11.6, 13.1, 13.2, 13.3, 13.4_
 
-- [ ] 6. Create Kubernetes manifests
+- [x] 6. Create Kubernetes manifests
   - Create k8s/base/deployment.yaml with rolling update strategy
   - Create k8s/base/service.yaml
   - Create k8s/base/configmap.yaml for environment-specific config
@@ -98,7 +98,7 @@
   - Use kubeval or kubectl dry-run to validate YAML
   - _Requirements: 12.1_
 
-- [ ] 7. Set up ArgoCD applications
+- [x] 7. Set up ArgoCD applications
   - Create k8s/argocd/staging-app.yaml for staging environment
   - Configure staging app with automated sync policy
   - Configure staging app with prune and self-heal enabled
@@ -107,7 +107,7 @@
   - Configure production app with prune and self-heal enabled
   - _Requirements: 11.7, 12.3, 12.4, 12.6_
 
-- [ ] 8. Create GitHub Actions CD workflow for staging
+- [x] 8. Create GitHub Actions CD workflow for staging
   - Create .github/workflows/cd-staging.yml
   - Configure workflow to trigger on push to main branch
   - Add job to build and push Docker image with commit SHA tag

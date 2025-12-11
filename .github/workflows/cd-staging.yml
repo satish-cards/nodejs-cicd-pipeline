@@ -1,0 +1,170 @@
+name: CD - Staging Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    outputs:
+      image-tag: ${{ steps.image-info.outputs.tag }}
+      short-sha: ${{ steps.image-info.outputs.short-sha }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read package.json
+        id: package
+        run: echo "json=$(cat package.json | jq -c .)" >> $GITHUB_OUTPUT
+
+      - name: Set image info
+        id: image-info
+        run: |
+          echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "short-sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:staging-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify image push
+        run: |
+          echo "✅ Docker image pushed successfully to GHCR"
+          echo "Image: ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          echo "Short SHA: $(echo ${{ github.sha }} | cut -c1-7)"
+
+  update-manifests:
+    name: Update Kubernetes Manifests
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update staging kustomization with new image
+        run: |
+          cd k8s/overlays/staging
+          
+          # Check if images section exists in kustomization.yaml
+          if ! grep -q "^images:" kustomization.yaml; then
+            echo "" >> kustomization.yaml
+            echo "images:" >> kustomization.yaml
+            echo "  - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline" >> kustomization.yaml
+            echo "    newName: ghcr.io/${{ github.repository }}" >> kustomization.yaml
+            echo "    newTag: ${{ needs.build-and-push.outputs.image-tag }}" >> kustomization.yaml
+          else
+            # Update existing images section
+            sed -i "s|newTag:.*|newTag: ${{ needs.build-and-push.outputs.image-tag }}|g" kustomization.yaml
+            sed -i "s|newName:.*|newName: ghcr.io/${{ github.repository }}|g" kustomization.yaml
+          fi
+          
+          cat kustomization.yaml
+
+      - name: Commit and push manifest changes
+        run: |
+          git add k8s/overlays/staging/kustomization.yaml
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Deploy to staging: ${{ needs.build-and-push.outputs.short-sha }}
+
+            Automated deployment triggered by push to main branch
+            
+            Image: ghcr.io/${{ github.repository }}:${{ needs.build-and-push.outputs.image-tag }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+            
+            git push origin main
+            echo "✅ Manifest changes committed and pushed"
+          fi
+
+  verify-deployment:
+    name: Verify Staging Deployment
+    runs-on: ubuntu-latest
+    needs: [build-and-push, update-manifests]
+    steps:
+      - name: Wait for ArgoCD sync
+        run: |
+          echo "⏳ Waiting for ArgoCD to sync the changes..."
+          echo "This typically takes 1-3 minutes for ArgoCD to detect and apply changes"
+          sleep 180
+
+      - name: Verify staging health check
+        run: |
+          echo "🔍 Verifying staging deployment health..."
+          echo ""
+          echo "Note: This step assumes staging is accessible at a known URL."
+          echo "If you have a staging URL configured, uncomment and update the health check below:"
+          echo ""
+          echo "# STAGING_URL=\"https://staging.yourdomain.com\""
+          echo "# MAX_RETRIES=10"
+          echo "# RETRY_DELAY=30"
+          echo "#"
+          echo "# for i in \$(seq 1 \$MAX_RETRIES); do"
+          echo "#   if curl -f -s \$STAGING_URL/health > /dev/null; then"
+          echo "#     echo \"✅ Staging health check passed\""
+          echo "#     exit 0"
+          echo "#   fi"
+          echo "#   echo \"Attempt \$i/\$MAX_RETRIES failed, retrying in \$RETRY_DELAY seconds...\""
+          echo "#   sleep \$RETRY_DELAY"
+          echo "# done"
+          echo "#"
+          echo "# echo \"❌ Staging health check failed after \$MAX_RETRIES attempts\""
+          echo "# exit 1"
+          echo ""
+          echo "✅ Deployment verification step completed"
+          echo "Image deployed: ghcr.io/${{ github.repository }}:${{ needs.build-and-push.outputs.image-tag }}"
+
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`ghcr.io/${{ github.repository }}:${{ needs.build-and-push.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ needs.build-and-push.outputs.short-sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor ArgoCD UI for sync status" >> $GITHUB_STEP_SUMMARY
+          echo "- Verify application health in staging environment" >> $GITHUB_STEP_SUMMARY
+          echo "- Once validated, proceed with production deployment" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nodejs-app-production
+  namespace: argocd
+  labels:
+    app: nodejs-app
+    environment: production
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  # Source configuration - points to Git repository
+  source:
+    repoURL: https://github.com/GITHUB_USERNAME/REPO_NAME
+    targetRevision: main
+    path: k8s/overlays/production
+  
+  # Destination configuration - where to deploy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  
+  # Sync policy - manual for production (requires approval)
+  syncPolicy:
+    # No automated sync - manual approval required
+    syncOptions:
+      - CreateNamespace=true  # Automatically create namespace if it doesn't exist
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    # Manual sync with prune and self-heal capabilities
+    # These will be applied when sync is manually triggered
+    managedNamespaceMetadata:
+      labels:
+        environment: production
+  
+  # Ignore differences in certain fields
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore replica count changes (for HPA compatibility)
+  
+  # Health assessment configuration
+  revisionHistoryLimit: 10

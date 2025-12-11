@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: production
+
+bases:
+  - ../../base
+
+namePrefix: production-
+
+commonLabels:
+  environment: production
+
+configMapGenerator:
+  - name: nodejs-app-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+
+patches:
+  - path: patches.yaml
