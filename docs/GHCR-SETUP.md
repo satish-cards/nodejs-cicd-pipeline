@@ -65,6 +65,12 @@ For the workflow to push images to GHCR, you need to enable write permissions:
 5. Check **Allow GitHub Actions to create and approve pull requests**
 6. Click **Save**
 
+**Important Notes:**
+- The workflow has `permissions: packages: write` configured at the job level
+- Images are only pushed on direct pushes to branches (not on pull requests)
+- Pull requests will build and test images but skip the push step
+- This prevents permission issues and unnecessary image creation for PRs
+
 ## How to Use
 
 ### Viewing Your Images
@@ -118,10 +124,19 @@ docker pull ghcr.io/{owner}/nodejs-cicd-pipeline:latest
 
 ### When Images Are Built
 
-Images are built and pushed:
-- ✅ On every push to any branch (after tests pass)
-- ✅ On every pull request (after tests pass)
+Images are built and tested:
+- ✅ On every push to any branch
+- ✅ On every pull request
+
+Images are pushed to GHCR:
+- ✅ On direct pushes to branches (after tests pass)
+- ❌ NOT on pull requests (build and test only)
 - ✅ Only if lint, test, and build jobs succeed
+
+This approach:
+- Prevents permission issues with PRs from forks
+- Reduces unnecessary image creation
+- Still validates Docker builds work in PRs
 
 ### Image Visibility
 
@@ -171,14 +186,29 @@ docker stop test && docker rm test
 
 ## Troubleshooting
 
-### Error: "denied: permission_denied"
+### Error: "denied: permission_denied" or "installation not allowed to Create organization package"
 
 **Problem**: Workflow cannot push to GHCR
 
-**Solution**:
-1. Check workflow permissions (Settings → Actions → General)
-2. Enable "Read and write permissions"
-3. Re-run the workflow
+**Solutions**:
+1. **Enable workflow permissions**:
+   - Go to Settings → Actions → General
+   - Enable "Read and write permissions"
+   - Save and re-run the workflow
+
+2. **Check if it's a pull request**:
+   - The workflow intentionally skips GHCR push for PRs
+   - This is normal behavior to prevent permission issues
+   - Merge the PR or push directly to see images published
+
+3. **For organization repositories**:
+   - Go to Organization Settings → Actions → General
+   - Enable "Read and write permissions" at org level
+   - Or grant package permissions to the repository
+
+4. **Verify job permissions**:
+   - The workflow includes `permissions: packages: write`
+   - This should be sufficient for most cases
 
 ### Error: "authentication required"
 

@@ -14,11 +14,15 @@ git commit -m "Add GHCR integration"
 git push origin main
 ```
 
+**Note**: Push directly to a branch (not via PR) for images to be published.
+
 ### Step 3: Verify
 1. Go to **Actions** tab
 2. Wait for workflow to complete (green checkmark)
-3. Go to **Packages** (right sidebar)
+3. Go to **Packages** (right sidebar or your profile)
 4. See your `nodejs-cicd-pipeline` package with 3 tags
+
+**If no package appears**: Check workflow permissions (Step 1) and ensure you pushed directly to a branch (not a PR).
 
 ## 🎯 Quick Test
 
@@ -56,9 +60,15 @@ After each successful build, you get:
 
 **Workflow fails with "permission denied"**
 → Enable write permissions (Step 1 above)
+→ Ensure you're pushing directly to a branch (not a PR)
+
+**No package appears after successful workflow**
+→ Check if it was a pull request (PRs skip GHCR push)
+→ Push directly to main or another branch
 
 **Can't pull image**
 → Check image visibility in Package settings
+→ Authenticate for private repos: `docker login ghcr.io`
 
 **Wrong version tag**
 → Update version in package.json and push
