@@ -21,7 +21,7 @@ app.use('/api/data', dataRouter);
 app.use((req, res, next) => {
   const error = new Error('Not Found');
   error.status = 404;
-  error.code = 'NOT_FOUND';
+  error.code = 'Page Not_Found';
   next(error);
 });
 

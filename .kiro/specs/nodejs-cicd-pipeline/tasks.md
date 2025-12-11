@@ -72,7 +72,7 @@
   - Add branch protection rules requiring CI to pass
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 10.4, 11.4_
 
-- [ ] 5. Set up GitHub Container Registry integration
+- [x] 5. Set up GitHub Container Registry integration
   - Configure GitHub Actions to authenticate with GHCR
   - Add workflow step to build Docker image
   - Add workflow step to tag image with commit SHA

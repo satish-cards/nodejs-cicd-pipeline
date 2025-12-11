@@ -107,6 +107,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Read package.json
+        id: package
+        run: echo "json=$(cat package.json | jq -c .)" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=,format=long
+            type=semver,pattern={{version}},value=v${{ fromJSON(steps.package.outputs.json).version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ fromJSON(steps.package.outputs.json).version }}
+            type=semver,pattern={{major}},value=v${{ fromJSON(steps.package.outputs.json).version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
@@ -115,15 +138,35 @@ jobs:
           tags: nodejs-cicd-pipeline:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          load: true
 
       - name: Test Docker image
         run: |
-          docker build -t nodejs-cicd-pipeline:test .
-          docker run -d --name test-container -p 3000:3000 nodejs-cicd-pipeline:test
+          docker run -d --name test-container -p 3000:3000 nodejs-cicd-pipeline:${{ github.sha }}
           sleep 5
           curl -f http://localhost:3000/health || exit 1
           docker stop test-container
           docker rm test-container
+
+      - name: Build and push Docker image to GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:v${{ fromJSON(steps.package.outputs.json).version }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify image push to GHCR
+        run: |
+          echo "Image pushed successfully to GHCR"
+          echo "Image tags:"
+          echo "  - ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          echo "  - ghcr.io/${{ github.repository }}:v${{ fromJSON(steps.package.outputs.json).version }}"
+          echo "  - ghcr.io/${{ github.repository }}:latest"
 
   status:
     name: CI Status Check

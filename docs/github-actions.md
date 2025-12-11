@@ -81,21 +81,31 @@ on:
 
 **Fails if**: Any test fails
 
-### 4. Build Docker Image
+### 4. Build Docker Image and Push to GHCR
 
-**Purpose**: Verify Docker image builds successfully and runs correctly
+**Purpose**: Build Docker image, test it, and push to GitHub Container Registry
 
 **Steps**:
 1. Checkout code
 2. Setup Docker Buildx (advanced build features)
-3. Build Docker image tagged with commit SHA
-4. Test the built image:
+3. Read package.json for semantic versioning
+4. Authenticate with GitHub Container Registry (GHCR)
+5. Extract Docker metadata for tagging
+6. Build Docker image locally for testing
+7. Test the built image:
    - Start container
    - Wait 5 seconds for startup
    - Curl health endpoint
    - Stop and remove container
+8. Build and push image to GHCR with multiple tags
+9. Verify push succeeded
 
-**Image tagging**: `nodejs-cicd-pipeline:${GITHUB_SHA}`
+**Image tagging strategy**:
+- `ghcr.io/{repository}:{commit-sha}` - Specific commit version
+- `ghcr.io/{repository}:v{version}` - Semantic version from package.json
+- `ghcr.io/{repository}:latest` - Latest version (main branch only)
+
+**Authentication**: Uses `GITHUB_TOKEN` (automatically provided by GitHub Actions)
 
 **Caching**: Uses GitHub Actions cache for Docker layers
 
@@ -103,6 +113,7 @@ on:
 - Docker build fails
 - Container doesn't start
 - Health check fails
+- Push to GHCR fails
 
 ### 5. CI Status Check
 
@@ -313,10 +324,12 @@ The CI workflow uses the following GitHub-provided environment variables:
 
 - `GITHUB_SHA`: Commit SHA for image tagging
 - `GITHUB_REF`: Branch or tag reference
-- `GITHUB_REPOSITORY`: Repository name
+- `GITHUB_REPOSITORY`: Repository name (used for GHCR image path)
+- `GITHUB_TOKEN`: Authentication token for GHCR (automatically provided)
+- `GITHUB_ACTOR`: Username for GHCR authentication
 - `RUNNER_OS`: Operating system (ubuntu-latest)
 
-No custom secrets are required for the CI workflow.
+No custom secrets are required for the CI workflow. The `GITHUB_TOKEN` is automatically provided by GitHub Actions with appropriate permissions.
 
 ## Future Enhancements
 
@@ -330,6 +343,108 @@ Potential improvements to consider:
 6. **Performance benchmarks**: Track build and test times
 7. **Automatic dependency updates**: Dependabot integration
 
+## GitHub Container Registry (GHCR)
+
+### Overview
+
+The workflow automatically pushes Docker images to GitHub Container Registry after successful builds and tests. GHCR provides:
+- Free container storage for public repositories
+- Integrated with GitHub authentication
+- Version tracking and management
+- Easy access control
+
+### Image Naming Convention
+
+Images are pushed to: `ghcr.io/{owner}/{repository}`
+
+Example: `ghcr.io/myusername/nodejs-cicd-pipeline`
+
+### Tagging Strategy
+
+Each successful build creates three tags:
+
+1. **Commit SHA tag**: `{full-commit-sha}`
+   - Immutable reference to specific commit
+   - Example: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0`
+   - Use for: Exact version tracking, rollbacks
+
+2. **Semantic version tag**: `v{major}.{minor}.{patch}`
+   - Based on version in package.json
+   - Example: `v1.0.0`
+   - Use for: Release management, production deployments
+
+3. **Latest tag**: `latest`
+   - Only created for main branch builds
+   - Points to most recent successful build
+   - Use for: Development, quick testing
+
+### Accessing Images
+
+**Pull an image**:
+```bash
+# Pull latest version
+docker pull ghcr.io/{owner}/{repository}:latest
+
+# Pull specific version
+docker pull ghcr.io/{owner}/{repository}:v1.0.0
+
+# Pull specific commit
+docker pull ghcr.io/{owner}/{repository}:{commit-sha}
+```
+
+**Authentication** (for private repositories):
+```bash
+# Create personal access token with read:packages scope
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+
+# Pull image
+docker pull ghcr.io/{owner}/{repository}:latest
+```
+
+### Viewing Images
+
+1. Go to repository main page on GitHub
+2. Click "Packages" in right sidebar
+3. View all published images and tags
+4. See download statistics and usage
+
+### Image Permissions
+
+By default, images inherit repository visibility:
+- Public repository → Public images
+- Private repository → Private images
+
+To change image visibility:
+1. Go to package page
+2. Click "Package settings"
+3. Change visibility under "Danger Zone"
+
+### Troubleshooting GHCR
+
+**Problem**: Push to GHCR fails with authentication error
+
+**Solutions**:
+1. Verify `GITHUB_TOKEN` has `write:packages` permission
+2. Check repository settings → Actions → General → Workflow permissions
+3. Ensure "Read and write permissions" is enabled
+4. Re-run workflow after updating permissions
+
+**Problem**: Image not visible in packages
+
+**Solutions**:
+1. Check workflow logs for push errors
+2. Verify build job completed successfully
+3. Wait a few minutes for GitHub to process
+4. Check package visibility settings
+
+**Problem**: Cannot pull image
+
+**Solutions**:
+1. Verify image name and tag are correct
+2. Authenticate with `docker login ghcr.io` for private images
+3. Check you have read access to repository
+4. Use full image path including `ghcr.io/` prefix
+
 ## Compliance
 
 This CI workflow satisfies the following requirements:
@@ -341,3 +456,8 @@ This CI workflow satisfies the following requirements:
 - **4.5**: Docker image building with commit SHA tagging ✅
 - **10.4**: CI runs on pull requests before merge ✅
 - **11.4**: Uses GitHub Actions as CI/CD platform ✅
+- **11.6**: Uses GitHub Container Registry for artifact storage ✅
+- **13.1**: Tags images with Git commit SHA ✅
+- **13.2**: Tags images with semantic version ✅
+- **13.3**: Requires authentication for GHCR access ✅
+- **13.4**: Verifies push succeeded in workflow ✅

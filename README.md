@@ -189,7 +189,19 @@ Runs on every push and pull request:
 2. ✅ Run ESLint for code quality
 3. ✅ Execute test suite with coverage
 4. ✅ Build and test Docker image
-5. ✅ Verify health checks
+5. ✅ Push to GitHub Container Registry (GHCR)
+6. ✅ Verify health checks
+
+### Container Registry
+Docker images are automatically published to GitHub Container Registry with multiple tags:
+- `ghcr.io/{owner}/{repo}:{commit-sha}` - Specific commit version
+- `ghcr.io/{owner}/{repo}:v{version}` - Semantic version
+- `ghcr.io/{owner}/{repo}:latest` - Latest build (main branch)
+
+Pull an image:
+```bash
+docker pull ghcr.io/{owner}/nodejs-cicd-pipeline:latest
+```
 
 ### Continuous Deployment (CD)
 - **Staging**: Automatic deployment on merge to `main`
