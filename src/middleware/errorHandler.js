@@ -1,6 +1,6 @@
 const { log } = require('./logger');
 
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   log('error', err.message, {
     stack: err.stack,
     path: req.path,

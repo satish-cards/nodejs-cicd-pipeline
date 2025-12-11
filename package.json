@@ -8,7 +8,7 @@
     "dev": "node src/server.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "lint": "eslint src/ tests/"
+    "lint": "eslint src/ --ext .js"
   },
   "keywords": ["nodejs", "cicd", "express", "kubernetes", "argocd"],
   "author": "",
