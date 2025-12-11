@@ -6,7 +6,7 @@ const sampleUsers = [
   {
     id: '1',
     name: 'Satish Kumar',
-    email: 'alice@example.com',
+    email: 'satish@gmail.com',
     createdAt: '2024-01-01T00:00:00.000Z'
   },
   {
