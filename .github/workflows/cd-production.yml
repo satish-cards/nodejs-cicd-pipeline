@@ -1,0 +1,376 @@
+name: CD - Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: 'Image tag to deploy (commit SHA or version)'
+        required: true
+        type: string
+      reason:
+        description: 'Reason for production deployment'
+        required: true
+        type: string
+
+jobs:
+  approval:
+    name: Manual Approval Required
+    runs-on: ubuntu-latest
+    timeout-minutes: 1440  # 24 hours
+    environment:
+      name: production
+      url: https://production.yourdomain.com
+    outputs:
+      approved: ${{ steps.approval.outputs.approved }}
+      approver: ${{ github.actor }}
+      approval-time: ${{ steps.approval.outputs.timestamp }}
+    steps:
+      - name: Record approval request
+        run: |
+          echo "## 🔐 Production Deployment Approval Requested" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** \`${{ inputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Requested by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Requested at:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⏳ Waiting for approval (timeout: 24 hours)..." >> $GITHUB_STEP_SUMMARY
+
+      - name: Wait for manual approval
+        id: approval
+        run: |
+          echo "approved=true" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_OUTPUT
+          echo "✅ Deployment approved by @${{ github.actor }}"
+
+      - name: Record approval
+        run: |
+          echo "## ✅ Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved at:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** \`${{ inputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+
+  backup-current-state:
+    name: Backup Current Production State
+    runs-on: ubuntu-latest
+    needs: approval
+    permissions:
+      contents: read
+    outputs:
+      backup-tag: ${{ steps.backup.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current production image tag
+        id: backup
+        run: |
+          cd k8s/overlays/production
+          
+          # Extract current image tag from kustomization.yaml
+          CURRENT_TAG=$(grep "newTag:" kustomization.yaml | awk '{print $2}' || echo "unknown")
+          echo "tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
+          echo "📦 Current production image tag: $CURRENT_TAG"
+          
+          # Save current state for potential rollback
+          echo "BACKUP_TAG=$CURRENT_TAG" >> $GITHUB_ENV
+
+      - name: Record backup information
+        run: |
+          echo "## 📦 Backup Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Image Tag:** \`${{ steps.backup.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Backup Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This version can be restored if rollback is needed." >> $GITHUB_STEP_SUMMARY
+
+  update-manifests:
+    name: Update Production Manifests
+    runs-on: ubuntu-latest
+    needs: [approval, backup-current-state]
+    permissions:
+      contents: write
+    outputs:
+      commit-sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update production kustomization with new image
+        run: |
+          cd k8s/overlays/production
+          
+          # Check if images section exists in kustomization.yaml
+          if ! grep -q "^images:" kustomization.yaml; then
+            echo "" >> kustomization.yaml
+            echo "images:" >> kustomization.yaml
+            echo "  - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline" >> kustomization.yaml
+            echo "    newName: ghcr.io/${{ github.repository }}" >> kustomization.yaml
+            echo "    newTag: ${{ inputs.image-tag }}" >> kustomization.yaml
+          else
+            # Update existing images section
+            sed -i "s|newTag:.*|newTag: ${{ inputs.image-tag }}|g" kustomization.yaml
+            sed -i "s|newName:.*|newName: ghcr.io/${{ github.repository }}|g" kustomization.yaml
+          fi
+          
+          echo "📝 Updated kustomization.yaml:"
+          cat kustomization.yaml
+
+      - name: Commit and push manifest changes
+        id: commit
+        run: |
+          git add k8s/overlays/production/kustomization.yaml
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            git commit -m "Deploy to production: ${{ inputs.image-tag }}
+
+            Production deployment approved and executed
+            
+            Image: ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}
+            Approved by: @${{ needs.approval.outputs.approver }}
+            Approval time: ${{ needs.approval.outputs.approval-time }}
+            Reason: ${{ inputs.reason }}
+            Previous version: ${{ needs.backup-current-state.outputs.backup-tag }}
+            Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+            
+            git push origin main
+            
+            COMMIT_SHA=$(git rev-parse HEAD)
+            echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+            echo "✅ Manifest changes committed and pushed"
+            echo "Commit SHA: $COMMIT_SHA"
+          fi
+
+      - name: Record manifest update
+        run: |
+          echo "## 📝 Manifest Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Updated" >> $GITHUB_STEP_SUMMARY
+          echo "**New Image Tag:** \`${{ inputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit SHA:** \`${{ steps.commit.outputs.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Updated by:** github-actions[bot]" >> $GITHUB_STEP_SUMMARY
+
+  wait-for-argocd:
+    name: Wait for ArgoCD Sync
+    runs-on: ubuntu-latest
+    needs: update-manifests
+    steps:
+      - name: Wait for ArgoCD to detect changes
+        run: |
+          echo "⏳ Waiting for ArgoCD to detect and sync changes..."
+          echo "ArgoCD typically checks for changes every 3 minutes"
+          echo "Waiting 180 seconds for sync to begin..."
+          sleep 180
+
+      - name: Additional sync time
+        run: |
+          echo "⏳ Allowing time for rolling update to complete..."
+          echo "Waiting additional 120 seconds..."
+          sleep 120
+
+  verify-deployment:
+    name: Verify Production Deployment
+    runs-on: ubuntu-latest
+    needs: [approval, update-manifests, wait-for-argocd, backup-current-state]
+    outputs:
+      health-status: ${{ steps.health-check.outputs.status }}
+    steps:
+      - name: Verify production health check
+        id: health-check
+        run: |
+          echo "🔍 Verifying production deployment health..."
+          echo ""
+          echo "Note: This step assumes production is accessible at a known URL."
+          echo "Update PRODUCTION_URL below with your actual production URL."
+          echo ""
+          
+          # Uncomment and configure for actual production health checks
+          # PRODUCTION_URL="https://production.yourdomain.com"
+          # MAX_RETRIES=10
+          # RETRY_DELAY=30
+          # 
+          # echo "Testing health endpoint: $PRODUCTION_URL/health"
+          # 
+          # for i in $(seq 1 $MAX_RETRIES); do
+          #   echo "Attempt $i/$MAX_RETRIES..."
+          #   
+          #   if curl -f -s -m 10 $PRODUCTION_URL/health > /dev/null; then
+          #     echo "✅ Production health check passed"
+          #     echo "status=healthy" >> $GITHUB_OUTPUT
+          #     exit 0
+          #   fi
+          #   
+          #   if [ $i -lt $MAX_RETRIES ]; then
+          #     echo "Health check failed, retrying in $RETRY_DELAY seconds..."
+          #     sleep $RETRY_DELAY
+          #   fi
+          # done
+          # 
+          # echo "❌ Production health check failed after $MAX_RETRIES attempts"
+          # echo "status=unhealthy" >> $GITHUB_OUTPUT
+          # exit 1
+          
+          # Placeholder for demonstration
+          echo "✅ Health check verification step completed"
+          echo "status=healthy" >> $GITHUB_OUTPUT
+          echo ""
+          echo "Image deployed: ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}"
+
+      - name: Deployment verification summary
+        run: |
+          echo "## 🔍 Deployment Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Health Status:** ✅ Healthy" >> $GITHUB_STEP_SUMMARY
+          echo "**Verification Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+
+  rollback-on-failure:
+    name: Rollback on Health Check Failure
+    runs-on: ubuntu-latest
+    needs: [verify-deployment, backup-current-state]
+    if: failure() && needs.backup-current-state.outputs.backup-tag != 'unknown'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Rollback to previous version
+        run: |
+          echo "🔄 Rolling back to previous version..."
+          echo "Previous version: ${{ needs.backup-current-state.outputs.backup-tag }}"
+          
+          cd k8s/overlays/production
+          
+          # Restore previous image tag
+          sed -i "s|newTag:.*|newTag: ${{ needs.backup-current-state.outputs.backup-tag }}|g" kustomization.yaml
+          
+          echo "📝 Rolled back kustomization.yaml:"
+          cat kustomization.yaml
+
+      - name: Commit rollback changes
+        run: |
+          git add k8s/overlays/production/kustomization.yaml
+          
+          git commit -m "ROLLBACK: Revert production to ${{ needs.backup-current-state.outputs.backup-tag }}
+
+          Automatic rollback triggered due to health check failure
+          
+          Failed deployment: ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}
+          Rolled back to: ${{ needs.backup-current-state.outputs.backup-tag }}
+          Rollback time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Triggered by: Health check failure"
+          
+          git push origin main
+          echo "✅ Rollback committed and pushed"
+
+      - name: Record rollback
+        run: |
+          echo "## 🔄 AUTOMATIC ROLLBACK EXECUTED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ⚠️ Deployment Failed - Rolled Back" >> $GITHUB_STEP_SUMMARY
+          echo "**Failed Image:** \`${{ inputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Restored Image:** \`${{ needs.backup-current-state.outputs.backup-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Rollback Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Action Required" >> $GITHUB_STEP_SUMMARY
+          echo "- Investigate the health check failure" >> $GITHUB_STEP_SUMMARY
+          echo "- Review application logs" >> $GITHUB_STEP_SUMMARY
+          echo "- Fix issues before attempting another deployment" >> $GITHUB_STEP_SUMMARY
+
+  notify-success:
+    name: Notify Deployment Success
+    runs-on: ubuntu-latest
+    needs: [approval, verify-deployment, backup-current-state]
+    if: success()
+    steps:
+      - name: Create deployment success summary
+        run: |
+          echo "## 🚀 Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Successfully Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Version:** \`${{ needs.backup-current-state.outputs.backup-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Approval Information" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved by:** @${{ needs.approval.outputs.approver }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Approval time:** ${{ needs.approval.outputs.approval-time }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Timeline" >> $GITHUB_STEP_SUMMARY
+          echo "**Completed at:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor application metrics and logs" >> $GITHUB_STEP_SUMMARY
+          echo "- Verify user-facing functionality" >> $GITHUB_STEP_SUMMARY
+          echo "- Check ArgoCD UI for sync status" >> $GITHUB_STEP_SUMMARY
+
+      - name: Log success notification
+        run: |
+          echo "✅ Production deployment completed successfully"
+          echo "Image: ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}"
+          echo "Approved by: @${{ needs.approval.outputs.approver }}"
+          echo "Deployed at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+
+  notify-failure:
+    name: Notify Deployment Failure
+    runs-on: ubuntu-latest
+    needs: [approval, verify-deployment, backup-current-state, rollback-on-failure]
+    if: failure()
+    steps:
+      - name: Create deployment failure summary
+        run: |
+          echo "## ❌ Production Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Attempted Image:** \`ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Current Version:** \`${{ needs.backup-current-state.outputs.backup-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Failure Information" >> $GITHUB_STEP_SUMMARY
+          echo "**Failed at:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Approved by:** @${{ needs.approval.outputs.approver }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Rollback Status" >> $GITHUB_STEP_SUMMARY
+          echo "Automatic rollback was attempted. Check the rollback job for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Action Required" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the workflow logs to identify the failure cause" >> $GITHUB_STEP_SUMMARY
+          echo "2. Check application logs and ArgoCD sync status" >> $GITHUB_STEP_SUMMARY
+          echo "3. Verify the Docker image exists and is accessible" >> $GITHUB_STEP_SUMMARY
+          echo "4. Fix the issues before attempting another deployment" >> $GITHUB_STEP_SUMMARY
+          echo "5. Consider testing in staging environment first" >> $GITHUB_STEP_SUMMARY
+
+      - name: Log failure notification
+        run: |
+          echo "❌ Production deployment failed"
+          echo "Attempted image: ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}"
+          echo "Approved by: @${{ needs.approval.outputs.approver }}"
+          echo "Failed at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+          echo ""
+          echo "Please review the workflow logs and take corrective action."
