@@ -131,27 +131,46 @@ jobs:
         run: |
           echo "🔍 Verifying staging deployment health..."
           echo ""
-          echo "Note: This step assumes staging is accessible at a known URL."
-          echo "If you have a staging URL configured, uncomment and update the health check below:"
+          echo "Note: For local Kubernetes, staging is accessible at http://localhost:30690"
+          echo "For cloud deployments, update STAGING_URL below with your actual URL."
           echo ""
-          echo "# STAGING_URL=\"https://staging.yourdomain.com\""
-          echo "# MAX_RETRIES=10"
-          echo "# RETRY_DELAY=30"
-          echo "#"
-          echo "# for i in \$(seq 1 \$MAX_RETRIES); do"
-          echo "#   if curl -f -s \$STAGING_URL/health > /dev/null; then"
-          echo "#     echo \"✅ Staging health check passed\""
-          echo "#     exit 0"
-          echo "#   fi"
-          echo "#   echo \"Attempt \$i/\$MAX_RETRIES failed, retrying in \$RETRY_DELAY seconds...\""
-          echo "#   sleep \$RETRY_DELAY"
-          echo "# done"
-          echo "#"
-          echo "# echo \"❌ Staging health check failed after \$MAX_RETRIES attempts\""
-          echo "# exit 1"
+          
+          # Configure staging URL based on environment
+          # For local Kubernetes with NodePort: http://localhost:30690
+          # For cloud with Ingress: https://staging.yourdomain.com
+          STAGING_URL="${STAGING_URL:-http://localhost:30690}"
+          MAX_RETRIES=10
+          RETRY_DELAY=30
+          
+          echo "Testing health endpoint: $STAGING_URL/health"
           echo ""
-          echo "✅ Deployment verification step completed"
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES..."
+            
+            if curl -f -s -m 10 "$STAGING_URL/health" > /dev/null 2>&1; then
+              echo "✅ Staging health check passed"
+              echo "Image deployed: ghcr.io/${{ github.repository }}:${{ needs.build-and-push.outputs.image-tag }}"
+              exit 0
+            fi
+            
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "Health check failed, retrying in $RETRY_DELAY seconds..."
+              sleep $RETRY_DELAY
+            fi
+          done
+          
+          echo "⚠️ Staging health check failed after $MAX_RETRIES attempts"
+          echo "This may be expected if:"
+          echo "  - Running in GitHub Actions without access to local Kubernetes"
+          echo "  - Staging environment is not yet configured"
+          echo "  - ArgoCD sync is still in progress"
+          echo ""
+          echo "✅ Deployment verification step completed (with warnings)"
           echo "Image deployed: ghcr.io/${{ github.repository }}:${{ needs.build-and-push.outputs.image-tag }}"
+          echo ""
+          echo "To verify manually, run: kubectl get pods -n staging"
+          exit 0
 
       - name: Deployment summary
         run: |

@@ -194,41 +194,42 @@ jobs:
         run: |
           echo "🔍 Verifying production deployment health..."
           echo ""
-          echo "Note: This step assumes production is accessible at a known URL."
-          echo "Update PRODUCTION_URL below with your actual production URL."
+          echo "Note: For local Kubernetes, production is accessible at http://localhost:30699"
+          echo "For cloud deployments, update PRODUCTION_URL below with your actual URL."
           echo ""
           
-          # Uncomment and configure for actual production health checks
-          # PRODUCTION_URL="https://production.yourdomain.com"
-          # MAX_RETRIES=10
-          # RETRY_DELAY=30
-          # 
-          # echo "Testing health endpoint: $PRODUCTION_URL/health"
-          # 
-          # for i in $(seq 1 $MAX_RETRIES); do
-          #   echo "Attempt $i/$MAX_RETRIES..."
-          #   
-          #   if curl -f -s -m 10 $PRODUCTION_URL/health > /dev/null; then
-          #     echo "✅ Production health check passed"
-          #     echo "status=healthy" >> $GITHUB_OUTPUT
-          #     exit 0
-          #   fi
-          #   
-          #   if [ $i -lt $MAX_RETRIES ]; then
-          #     echo "Health check failed, retrying in $RETRY_DELAY seconds..."
-          #     sleep $RETRY_DELAY
-          #   fi
-          # done
-          # 
-          # echo "❌ Production health check failed after $MAX_RETRIES attempts"
-          # echo "status=unhealthy" >> $GITHUB_OUTPUT
-          # exit 1
+          # Configure production URL based on environment
+          # For local Kubernetes with NodePort: http://localhost:30699
+          # For cloud with Ingress: https://production.yourdomain.com
+          PRODUCTION_URL="${PRODUCTION_URL:-http://localhost:30699}"
+          MAX_RETRIES=10
+          RETRY_DELAY=30
           
-          # Placeholder for demonstration
-          echo "✅ Health check verification step completed"
-          echo "status=healthy" >> $GITHUB_OUTPUT
+          echo "Testing health endpoint: $PRODUCTION_URL/health"
           echo ""
-          echo "Image deployed: ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}"
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES..."
+            
+            if curl -f -s -m 10 "$PRODUCTION_URL/health" > /dev/null 2>&1; then
+              echo "✅ Production health check passed"
+              echo "status=healthy" >> $GITHUB_OUTPUT
+              echo "Image deployed: ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}"
+              exit 0
+            fi
+            
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "Health check failed, retrying in $RETRY_DELAY seconds..."
+              sleep $RETRY_DELAY
+            fi
+          done
+          
+          echo "❌ Production health check failed after $MAX_RETRIES attempts"
+          echo "status=unhealthy" >> $GITHUB_OUTPUT
+          echo ""
+          echo "This will trigger automatic rollback to previous version."
+          echo "Check ArgoCD UI and pod logs for details."
+          exit 1
 
       - name: Deployment verification summary
         run: |
