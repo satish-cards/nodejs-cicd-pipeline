@@ -29,4 +29,4 @@ patchesStrategicMerge:
 images:
   - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline
     newName: ghcr.io/satish-cards/nodejs-cicd-pipeline
-    newTag: 2bce2d304fe6a5d9949f05f02ccecd47daad06e2
+    newTag: c84ce778c3dd1d8bdd46ce3386efd405335f6c72
