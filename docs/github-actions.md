@@ -274,6 +274,94 @@ See [Branch Protection Setup Guide](branch-protection-setup.md) for detailed ins
    - Helps debugging failed builds
    - Improves team communication
 
+## CD Workflows
+
+In addition to the CI workflow, the project includes two Continuous Deployment (CD) workflows:
+
+### CD - Staging Deployment
+
+**Location**: `.github/workflows/cd-staging.yml`
+
+**Trigger**: Automatic on push to `main` branch
+
+**Purpose**: Automatically deploy to staging environment after successful CI
+
+**Jobs**:
+1. Build and push Docker image to GHCR
+2. Update staging Kubernetes manifests
+3. Commit changes to trigger ArgoCD sync
+4. Verify deployment health
+
+See staging workflow file for details.
+
+### CD - Production Deployment
+
+**Location**: `.github/workflows/cd-production.yml`
+
+**Trigger**: Manual via workflow_dispatch
+
+**Purpose**: Deploy to production with manual approval and rollback capability
+
+**How to trigger**:
+1. Go to Actions tab in GitHub
+2. Select "CD - Production Deployment"
+3. Click "Run workflow"
+4. Enter image tag (commit SHA from staging)
+5. Enter deployment reason
+6. Click "Run workflow"
+
+**Jobs**:
+1. **Manual Approval**: Requires approval via GitHub environment protection (24-hour timeout)
+2. **Backup Current State**: Records current production version for rollback
+3. **Update Manifests**: Updates production Kubernetes manifests with new image
+4. **Wait for ArgoCD**: Allows time for ArgoCD to sync changes
+5. **Verify Deployment**: Runs health checks on production
+6. **Rollback on Failure**: Automatically reverts to previous version if health checks fail
+7. **Notify Success/Failure**: Creates deployment summary with all details
+
+**Key Features**:
+- ✅ Manual approval required (satisfies Requirement 6.1)
+- ✅ 24-hour approval timeout (satisfies Requirement 6.5)
+- ✅ Records approver and timestamp (satisfies Requirement 6.4)
+- ✅ Automatic rollback on health check failure (satisfies Requirement 7.4)
+- ✅ Deployment notifications with full details (satisfies Requirement 7.5)
+- ✅ Rolling update strategy (satisfies Requirement 7.1)
+- ✅ Backup of current state before deployment (satisfies Requirement 7.2)
+
+**Setting up GitHub Environment Protection**:
+
+To enable manual approval for production deployments:
+
+1. Go to repository Settings → Environments
+2. Click "New environment" and name it "production"
+3. Enable "Required reviewers"
+4. Add team members who can approve deployments
+5. Set environment URL (optional): `https://production.yourdomain.com`
+6. Save protection rules
+
+Now when the production workflow runs, it will pause at the approval job and wait for a designated reviewer to approve before proceeding.
+
+**Deployment Flow**:
+```
+Manual Trigger
+     ↓
+Approval Required (24h timeout)
+     ↓
+Backup Current Version
+     ↓
+Update Production Manifests
+     ↓
+Commit Changes
+     ↓
+Wait for ArgoCD Sync
+     ↓
+Verify Health Checks
+     ↓
+Success → Notify ✅
+     or
+Failure → Rollback → Notify ❌
+```
+
 ## Related Documentation
 
 - [CI/CD Overview](ci-cd-overview.md)

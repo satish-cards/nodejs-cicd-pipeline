@@ -11,7 +11,16 @@ const config = {
     format: process.env.NODE_ENV === 'production' ? 'json' : 'text'
   },
   app: {
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.APP_VERSION || process.env.npm_package_version || '1.0.0'
+  },
+  features: {
+    enableMetrics: process.env.ENABLE_METRICS === 'true',
+    enableDetailedErrors: process.env.ENABLE_DETAILED_ERRORS !== 'false'
+  },
+  secrets: {
+    apiKey: process.env.API_KEY || '',
+    jwtSecret: process.env.JWT_SECRET || '',
+    databaseUrl: process.env.DATABASE_URL || ''
   }
 };
 

@@ -51,6 +51,34 @@ spec:
             configMapKeyRef:
               name: nodejs-app-config
               key: LOG_LEVEL
+        - name: ENABLE_METRICS
+          valueFrom:
+            configMapKeyRef:
+              name: nodejs-app-config
+              key: ENABLE_METRICS
+        - name: ENABLE_DETAILED_ERRORS
+          valueFrom:
+            configMapKeyRef:
+              name: nodejs-app-config
+              key: ENABLE_DETAILED_ERRORS
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nodejs-app-secrets
+              key: API_KEY
+              optional: true
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: nodejs-app-secrets
+              key: JWT_SECRET
+              optional: true
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: nodejs-app-secrets
+              key: DATABASE_URL
+              optional: true
         resources:
           requests:
             cpu: 100m

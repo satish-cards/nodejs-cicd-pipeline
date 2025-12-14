@@ -17,7 +17,7 @@ const sampleUsers = [
   },
   {
     id: '3',
-    name: 'Charlie Brown',
+    name: 'Kumar',
     email: 'charlie@example.com',
     createdAt: '2024-01-03T00:00:00.000Z'
   }

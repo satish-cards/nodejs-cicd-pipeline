@@ -112,25 +112,144 @@ Once your code is on GitHub, the CI/CD pipeline will automatically run. To confi
 - `npm run test:watch` - Run tests in watch mode
 - `npm run lint` - Run ESLint code quality checks
 
-## API Endpoints
+## API Documentation
 
-### Health Check
-```bash
-GET /health
-```
-Returns server status, version, uptime, and environment information.
+### Health Check Endpoint
 
-### Users API
-```bash
-GET /api/users
-```
-Returns sample user data.
+**Endpoint**: `GET /health`
 
-### Data API
-```bash
-GET /api/data
+**Description**: Returns the operational status and metadata of the application server.
+
+**Response**:
+```json
+{
+  "status": "ok",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "version": "1.0.0",
+  "uptime": 120,
+  "environment": "development"
+}
 ```
-Returns sample data with timestamps.
+
+**Status Codes**:
+- `200 OK` - Server is healthy and operational
+
+**Use Cases**:
+- Kubernetes liveness and readiness probes
+- Monitoring and health checks
+- Deployment verification
+
+**Example**:
+```bash
+curl http://localhost:3000/health
+```
+
+---
+
+### Users API Endpoint
+
+**Endpoint**: `GET /api/users`
+
+**Description**: Returns a list of sample user data.
+
+**Response**:
+```json
+{
+  "users": [
+    {
+      "id": "1",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "createdAt": "2024-01-15T10:00:00.000Z"
+    },
+    {
+      "id": "2",
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "createdAt": "2024-01-15T10:05:00.000Z"
+    }
+  ],
+  "count": 2
+}
+```
+
+**Status Codes**:
+- `200 OK` - Successfully retrieved users
+- `500 Internal Server Error` - Server error occurred
+
+**Example**:
+```bash
+curl http://localhost:3000/api/users
+```
+
+---
+
+### Data API Endpoint
+
+**Endpoint**: `GET /api/data`
+
+**Description**: Returns sample data with timestamps and metadata.
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "id": "1",
+      "value": "Sample data 1",
+      "timestamp": "2024-01-15T10:30:00.000Z",
+      "metadata": {
+        "source": "api",
+        "type": "sample"
+      }
+    },
+    {
+      "id": "2",
+      "value": "Sample data 2",
+      "timestamp": "2024-01-15T10:31:00.000Z",
+      "metadata": {
+        "source": "api",
+        "type": "sample"
+      }
+    }
+  ],
+  "count": 2
+}
+```
+
+**Status Codes**:
+- `200 OK` - Successfully retrieved data
+- `500 Internal Server Error` - Server error occurred
+
+**Example**:
+```bash
+curl http://localhost:3000/api/data
+```
+
+---
+
+### Metrics Endpoint
+
+**Endpoint**: `GET /metrics`
+
+**Description**: Returns application metrics in Prometheus format for monitoring.
+
+**Response**: Plain text in Prometheus exposition format
+
+**Metrics Exposed**:
+- `http_requests_total` - Total number of HTTP requests
+- `http_request_duration_seconds` - HTTP request duration histogram
+- `http_requests_in_progress` - Number of HTTP requests currently in progress
+
+**Example**:
+```bash
+curl http://localhost:3000/metrics
+```
+
+**Use Cases**:
+- Prometheus scraping
+- Performance monitoring
+- Alerting based on metrics
 
 ## Testing
 
@@ -171,13 +290,75 @@ docker rm test-app
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `3000` |
-| `NODE_ENV` | Environment (development/staging/production) | `development` |
-| `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` |
+### Server Configuration
 
-See `.env.example` for complete configuration options.
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `PORT` | Server port number | `3000` | No |
+| `HOST` | Server host address | `0.0.0.0` | No |
+| `NODE_ENV` | Environment mode | `development` | No |
+
+**Valid NODE_ENV values**: `development`, `staging`, `production`
+
+### Logging Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `LOG_LEVEL` | Logging verbosity level | `info` | No |
+
+**Valid LOG_LEVEL values**: `debug`, `info`, `warn`, `error`
+
+**Log Behavior by Environment**:
+- `development`: Human-readable text format, debug level
+- `staging`: JSON format, info level
+- `production`: JSON format, warn level
+
+### Application Configuration
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `APP_VERSION` | Application version | `1.0.0` | No |
+
+### Feature Flags
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `ENABLE_METRICS` | Enable /metrics endpoint | `true` | No |
+| `ENABLE_DETAILED_ERRORS` | Show detailed error messages | `true` | No |
+
+**Note**: In production, `ENABLE_DETAILED_ERRORS` should be set to `false` to avoid exposing sensitive information.
+
+### Configuration File
+
+See `.env.example` for a complete template with all available configuration options:
+
+```bash
+cp .env.example .env
+# Edit .env with your values
+```
+
+### Environment-Specific Configuration
+
+**Development**:
+```bash
+NODE_ENV=development
+LOG_LEVEL=debug
+ENABLE_DETAILED_ERRORS=true
+```
+
+**Staging**:
+```bash
+NODE_ENV=staging
+LOG_LEVEL=info
+ENABLE_DETAILED_ERRORS=true
+```
+
+**Production**:
+```bash
+NODE_ENV=production
+LOG_LEVEL=warn
+ENABLE_DETAILED_ERRORS=false
+```
 
 ## CI/CD Pipeline
 
@@ -308,9 +489,23 @@ kubectl rollout undo deployment/staging-nodejs-app -n staging
 
 ## Documentation
 
+### Getting Started
 - 📖 [Git and GitHub Setup](docs/git-github-setup.md) - Get started with version control
-- 📖 [GitHub Actions CI/CD](docs/github-actions.md) - Understand the CI/CD pipeline
 - 📖 [Branch Protection Setup](docs/branch-protection-setup.md) - Configure branch protection rules
+
+### CI/CD Pipeline
+- 📖 [CI/CD Overview](docs/ci-cd-overview.md) - Complete pipeline architecture and flow
+- 📖 [GitHub Actions CI/CD](docs/github-actions.md) - Detailed workflow documentation
+- 📖 [Deployment Guide](docs/deployment-guide.md) - Step-by-step deployment instructions
+
+### Kubernetes and GitOps
+- 📖 [Kubernetes & ArgoCD Quick Start](docs/QUICK-START-K8S.md) - Fast setup guide
+- 📖 [Kubernetes & ArgoCD Setup](docs/kubernetes-argocd-setup.md) - Detailed installation guide
+- 📖 [ArgoCD Setup](docs/argocd-setup.md) - ArgoCD configuration
+
+### Configuration
+- 📖 [Environment Configuration](docs/environment-configuration.md) - Configuration management
+- 📖 [Secrets Management](k8s/SECRETS-MANAGEMENT.md) - Handling sensitive data
 
 ## Development Workflow
 
@@ -340,25 +535,403 @@ kubectl rollout undo deployment/staging-nodejs-app -n staging
 
 ## Troubleshooting
 
-### Server won't start
-- Check if port 3000 is already in use
-- Verify Node.js version (18+)
-- Ensure dependencies are installed: `npm install`
+### Local Development Issues
 
-### Tests failing
-- Run `npm install` to ensure all dependencies are present
-- Check for syntax errors: `npm run lint`
-- Review test output for specific failures
+#### Server won't start
 
-### Docker build fails
-- Ensure Docker is running
-- Check Dockerfile syntax
-- Verify all required files are present
+**Symptoms**:
+- Error: "Port 3000 is already in use"
+- Server crashes on startup
+- No response from server
 
-### CI workflow not running
-- Verify workflow file is in `.github/workflows/`
-- Check GitHub Actions is enabled in repository settings
-- Review workflow syntax for errors
+**Solutions**:
+```bash
+# Check if port is in use
+lsof -i :3000
+
+# Kill process using port 3000
+kill -9 $(lsof -t -i:3000)
+
+# Or use a different port
+PORT=3001 npm start
+
+# Verify Node.js version
+node --version  # Should be 18+
+
+# Reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+```
+
+#### Tests failing
+
+**Symptoms**:
+- Test suite fails
+- Coverage below threshold
+- Timeout errors
+
+**Solutions**:
+```bash
+# Ensure all dependencies are installed
+npm install
+
+# Run linting to check for syntax errors
+npm run lint
+
+# Run tests with verbose output
+npm test -- --verbose
+
+# Run specific test file
+npm test -- tests/health.test.js
+
+# Clear Jest cache
+npm test -- --clearCache
+```
+
+#### Linting errors
+
+**Symptoms**:
+- ESLint reports errors
+- CI pipeline fails on lint step
+
+**Solutions**:
+```bash
+# Check linting errors
+npm run lint
+
+# Auto-fix some errors
+npm run lint -- --fix
+
+# Check specific file
+npx eslint src/server.js
+```
+
+### Docker Issues
+
+#### Docker build fails
+
+**Symptoms**:
+- Build errors during `docker build`
+- Missing files or dependencies
+- Permission errors
+
+**Solutions**:
+```bash
+# Ensure Docker is running
+docker info
+
+# Check Dockerfile syntax
+docker build --no-cache -t test .
+
+# Verify .dockerignore isn't excluding needed files
+cat .dockerignore
+
+# Build with verbose output
+docker build --progress=plain -t test .
+```
+
+#### Container won't start
+
+**Symptoms**:
+- Container exits immediately
+- Health check fails
+- Application errors in logs
+
+**Solutions**:
+```bash
+# Check container logs
+docker logs <container-id>
+
+# Run container interactively
+docker run -it nodejs-cicd-pipeline sh
+
+# Check environment variables
+docker run nodejs-cicd-pipeline env
+
+# Test with different port
+docker run -p 3001:3000 -e PORT=3000 nodejs-cicd-pipeline
+```
+
+### CI/CD Issues
+
+#### CI workflow not running
+
+**Symptoms**:
+- No workflow runs appear in Actions tab
+- Workflow doesn't trigger on push
+
+**Solutions**:
+1. Verify workflow file location: `.github/workflows/ci.yml`
+2. Check YAML syntax: Use a YAML validator
+3. Ensure GitHub Actions is enabled:
+   - Go to Settings → Actions → General
+   - Enable "Allow all actions and reusable workflows"
+4. Check branch name matches trigger pattern
+5. Force trigger: Make a small change and push again
+
+#### CI pipeline fails
+
+**Symptoms**:
+- Lint job fails
+- Test job fails
+- Build job fails
+
+**Solutions**:
+
+**For lint failures**:
+```bash
+# Run locally first
+npm run lint
+npm run lint -- --fix
+git add .
+git commit -m "Fix linting errors"
+git push
+```
+
+**For test failures**:
+```bash
+# Run tests locally
+npm test
+
+# Check for environment differences
+NODE_ENV=test npm test
+
+# Review test logs in GitHub Actions
+```
+
+**For build failures**:
+```bash
+# Test Docker build locally
+docker build -t test .
+
+# Check for missing files
+git status
+git add <missing-files>
+```
+
+#### Image push to GHCR fails
+
+**Symptoms**:
+- Authentication errors
+- Permission denied
+- Image not appearing in packages
+
+**Solutions**:
+1. Check repository settings:
+   - Settings → Actions → General
+   - Workflow permissions: "Read and write permissions"
+2. Verify GITHUB_TOKEN has correct permissions
+3. Check package visibility settings
+4. Wait a few minutes and retry
+
+### Kubernetes Issues
+
+#### Pods not starting
+
+**Symptoms**:
+- Pods stuck in "Pending" or "ImagePullBackOff"
+- CrashLoopBackOff status
+
+**Solutions**:
+```bash
+# Check pod status
+kubectl get pods -n staging
+
+# Describe pod for details
+kubectl describe pod <pod-name> -n staging
+
+# Check logs
+kubectl logs <pod-name> -n staging
+
+# Check events
+kubectl get events -n staging --sort-by='.lastTimestamp'
+```
+
+**Common causes**:
+- Image pull errors: Check image pull secret
+- Resource constraints: Check node resources
+- Configuration errors: Check ConfigMap and environment variables
+- Health check failures: Check application logs
+
+#### Image pull errors
+
+**Symptoms**:
+- "ImagePullBackOff" or "ErrImagePull"
+- Authentication errors
+
+**Solutions**:
+```bash
+# Verify image exists in GHCR
+# Check GitHub → Packages
+
+# Recreate image pull secret
+kubectl delete secret ghcr-secret -n staging
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=$GITHUB_USERNAME \
+  --docker-password=$GITHUB_TOKEN \
+  -n staging
+
+# Verify secret is referenced in deployment
+kubectl get deployment staging-nodejs-app -n staging -o yaml | grep imagePullSecrets
+```
+
+#### Service not accessible
+
+**Symptoms**:
+- Cannot access application
+- Connection refused
+- Timeout errors
+
+**Solutions**:
+```bash
+# Check service exists
+kubectl get svc -n staging
+
+# Check service endpoints
+kubectl get endpoints -n staging
+
+# Port forward to test
+kubectl port-forward svc/staging-nodejs-app -n staging 3000:3000
+
+# For Minikube, use service URL
+minikube service staging-nodejs-app -n staging --url
+```
+
+### ArgoCD Issues
+
+#### Application out of sync
+
+**Symptoms**:
+- ArgoCD shows "OutOfSync"
+- Changes not deploying
+
+**Solutions**:
+```bash
+# Check application status
+argocd app get nodejs-app-staging
+
+# View differences
+argocd app diff nodejs-app-staging
+
+# Force sync
+argocd app sync nodejs-app-staging
+
+# Hard refresh
+argocd app get nodejs-app-staging --hard-refresh
+```
+
+#### ArgoCD UI not accessible
+
+**Symptoms**:
+- Cannot access ArgoCD UI
+- Connection refused
+
+**Solutions**:
+```bash
+# Check ArgoCD pods are running
+kubectl get pods -n argocd
+
+# Port forward ArgoCD server
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# Get admin password
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+```
+
+### Common Error Messages
+
+#### "EADDRINUSE: address already in use"
+
+**Cause**: Port 3000 is already in use
+
+**Solution**:
+```bash
+# Find and kill process
+lsof -i :3000
+kill -9 <PID>
+
+# Or use different port
+PORT=3001 npm start
+```
+
+#### "Cannot find module"
+
+**Cause**: Missing dependencies
+
+**Solution**:
+```bash
+npm install
+```
+
+#### "Permission denied"
+
+**Cause**: File permission issues
+
+**Solution**:
+```bash
+# Fix file permissions
+chmod +x <file>
+
+# For Docker
+sudo usermod -aG docker $USER
+# Then log out and back in
+```
+
+#### "Context deadline exceeded"
+
+**Cause**: Kubernetes operation timeout
+
+**Solution**:
+```bash
+# Increase timeout
+kubectl wait --for=condition=Ready pods --all -n staging --timeout=600s
+
+# Check what's blocking
+kubectl get events -n staging
+```
+
+### Getting Help
+
+If you're still stuck:
+
+1. **Check logs**: Application, Docker, Kubernetes, ArgoCD
+2. **Review documentation**: See links in [Documentation](#documentation) section
+3. **Search issues**: Check GitHub issues for similar problems
+4. **Ask for help**: Create a new issue with:
+   - Description of the problem
+   - Steps to reproduce
+   - Error messages and logs
+   - Environment details (OS, versions, etc.)
+
+### Useful Debugging Commands
+
+```bash
+# Application
+npm run lint
+npm test
+npm start
+
+# Docker
+docker ps
+docker logs <container-id>
+docker exec -it <container-id> sh
+
+# Kubernetes
+kubectl get all -n staging
+kubectl describe pod <pod-name> -n staging
+kubectl logs -f <pod-name> -n staging
+kubectl get events -n staging
+
+# ArgoCD
+argocd app list
+argocd app get <app-name>
+argocd app sync <app-name>
+argocd app logs <app-name>
+```
+
+For more detailed troubleshooting, see the [Deployment Guide](docs/deployment-guide.md#troubleshooting)
 
 ## Contributing
 

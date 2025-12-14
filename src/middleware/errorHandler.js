@@ -1,4 +1,5 @@
 const { log } = require('./logger');
+const config = require('../config');
 
 function errorHandler(err, req, res, _next) {
   log('error', err.message, {
@@ -15,6 +16,15 @@ function errorHandler(err, req, res, _next) {
       timestamp: new Date().toISOString()
     }
   };
+  
+  // Include stack trace and additional details only if enabled
+  if (config.features.enableDetailedErrors) {
+    errorResponse.error.details = {
+      stack: err.stack,
+      path: req.path,
+      method: req.method
+    };
+  }
   
   res.status(statusCode).json(errorResponse);
 }

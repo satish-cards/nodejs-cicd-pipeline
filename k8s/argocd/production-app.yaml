@@ -13,7 +13,7 @@ spec:
   
   # Source configuration - points to Git repository
   source:
-    repoURL: https://github.com/GITHUB_USERNAME/REPO_NAME
+    repoURL: https://github.com/satish-cards/nodejs-cicd-pipeline
     targetRevision: main
     path: k8s/overlays/production
   
