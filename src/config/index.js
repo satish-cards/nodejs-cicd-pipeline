@@ -14,7 +14,7 @@ const config = {
     version: process.env.APP_VERSION || process.env.npm_package_version || '1.0.0'
   },
   features: {
-    enableMetrics: process.env.ENABLE_METRICS === 'true',
+    enableMetrics: process.env.ENABLE_METRICS !== 'false',
     enableDetailedErrors: process.env.ENABLE_DETAILED_ERRORS !== 'false'
   },
   secrets: {
