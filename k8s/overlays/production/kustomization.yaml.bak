@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: production
+
+bases:
+  - ../../base
+
+namePrefix: production-
+
+commonLabels:
+  environment: production
+
+configMapGenerator:
+  - name: nodejs-app-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+      - ENABLE_METRICS=true
+      - ENABLE_DETAILED_ERRORS=false
+
+patches:
+  - path: patches.yaml
+
+patchesStrategicMerge:
+  - service-patch.yaml
+
+images:
+  - name: ghcr.io/GITHUB_USERNAME/nodejs-cicd-pipeline
+    newName: ghcr.io/satish-cards/nodejs-cicd-pipeline
+    newTag: 949508d3e2da5361137f926e7174a0b3032089bb
